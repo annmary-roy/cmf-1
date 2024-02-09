@@ -161,6 +161,16 @@ class Cmf:
 
 
     @staticmethod
+    def __load_neo4j_params():
+         cmf_config = os.environ.get("CONFIG_FILE", ".cmfconfig")
+         if os.path.exists(cmf_config):
+             attr_dict = CmfConfig.read_config(cmf_config)
+             __neo4j_uri = attr_dict.get("neo4j-uri", "")
+             __neo4j_password = attr_dict.get("neo4j-password", "")
+             __neo4j_user = attr_dict.get("neo4j-user", "")
+
+
+    @staticmethod
     def __get_neo4j_server_config():
         Cmf.__neo4j_uri = os.getenv('NEO4J_URI', "")
         Cmf.__neo4j_user = os.getenv('NEO4J_USER_NAME', "")
