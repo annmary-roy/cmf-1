@@ -114,6 +114,13 @@ class Cmf:
         graph: bool = False,
         is_server: bool = False,
     ):
+        #path to directory
+        self.cmf_init_path = filename.rsplit("/",1)[0] \
+				 if len(filename.rsplit("/",1)) > 1 \
+					else  os.getcwd()
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path:
+            os.chdir(self.cmf_init_path)
         if is_server is False:
             Cmf.__prechecks()
         if custom_properties is None:
@@ -130,9 +137,8 @@ class Cmf:
         self.input_artifacts = []
         self.execution_label_props = {}
         self.graph = graph
+        #last token in filepath
         self.branch_name = filename.rsplit("/", 1)[-1]
-        self.cmf_init_path = os.getcwd()
-  
 
         if is_server is False:
             git_checkout_new_branch(self.branch_name)
@@ -151,6 +157,7 @@ class Cmf:
             self.driver.create_pipeline_node(
                 pipeline_name, self.parent_context.id, custom_properties
             )
+        os.chdir(logging_dir)
 
     @staticmethod
     def __load_neo4j_params():
@@ -347,6 +354,11 @@ class Cmf:
             Execution object from ML Metadata library associated with the new execution for this stage.
         """
         # Initializing the execution related fields
+
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path:
+            os.chdir(self.cmf_init_path)
+
         self.metrics = {}
         self.input_artifacts = []
         self.execution_label_props = {}
@@ -397,7 +409,7 @@ class Cmf:
             self.execution.id,
             custom_props,
         )
-
+        os.chdir(logging_dir)
         return self.execution
 
     def update_execution(
@@ -629,7 +641,11 @@ class Cmf:
         # If the dataset already exist , then we just link the existing dataset to the execution
         # We do not update the dataset properties . 
         # We need to append the new properties to the existing dataset properties
-        if not os.getcwd() == self.cmf_init_path: 
+        print("logging dataset")
+        logging_dir = os.getcwd()
+        print(os.getcwd())
+        if not logging_dir == self.cmf_init_path: 
+            print("changing dir")
             os.chdir(self.cmf_init_path)
         custom_props = {} if custom_properties is None else custom_properties
         git_repo = git_get_repo()
@@ -641,7 +657,13 @@ class Cmf:
 
         commit_output(url, self.execution.id)
         c_hash = dvc_get_hash(url)
+
+        if c_hash == "":
+            print("Error in getting the dvc hash,return without logging")
+            return null
+
         dataset_commit = c_hash
+        
         dvc_url = dvc_get_url(url)
         dvc_url_with_pipeline = f"{self.parent_context.name}:{dvc_url}"
         url = url + ":" + c_hash
@@ -737,7 +759,7 @@ class Cmf:
                 self.driver.create_artifact_relationships(
                     self.input_artifacts, child_artifact, self.execution_label_props
                 )
-        os.chdir(os.getcwd())
+        os.chdir(logging_dir)
         return artifact
 
     def update_dataset_url(self, artifact: mlpb.Artifact, updated_url: str):
@@ -962,7 +984,8 @@ class Cmf:
         # If the model already exist , then we just link the existing model to the execution
         # We do not update the model properties . 
         # We need to append the new properties to the existing model properties
-        if not os.getcwd() == self.cmf_init_path: 
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path: 
             os.chdir(self.cmf_init_path)
 
         if custom_properties is None:
@@ -976,6 +999,11 @@ class Cmf:
 
         commit_output(path, self.execution.id)
         c_hash = dvc_get_hash(path)
+
+        if c_hash == "":
+            print("Error in getting the dvc hash,return without logging")
+            return null
+
         model_commit = c_hash
 
         # If connecting to an existing artifact - The name of the artifact is
@@ -1077,7 +1105,7 @@ class Cmf:
                 self.driver.create_artifact_relationships(
                     self.input_artifacts, child_artifact, self.execution_label_props
                 )
-        os.chdir(os.getcwd())
+        os.chdir(logging_dir)
         return artifact
 
     # Add the model to dvc do a git commit and store the commit id in MLMD
@@ -1319,7 +1347,8 @@ class Cmf:
         Returns:
               Artifact object from ML Metadata library associated with the new coarse-grained metrics artifact.
         """
-        if not os.getcwd() == self.cmf_init_path: 
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path: 
             os.chdir(self.cmf_init_path)
         custom_props = {} if custom_properties is None else custom_properties
         uri = str(uuid.uuid1())
@@ -1360,7 +1389,7 @@ class Cmf:
             self.driver.create_artifact_relationships(
                 self.input_artifacts, child_artifact, self.execution_label_props
             )
-        os.chdir(os.getcwd())
+        os.chdir(logging_dir)
         return metrics
 
     def log_metric(
@@ -1382,7 +1411,8 @@ class Cmf:
             metrics_name: Name to identify the metrics.
             custom_properties: Dictionary with metrics.
         """
-        if not os.getcwd() == self.cmf_init_path: 
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path: 
             os.chdir(self.cmf_init_path)
         if metrics_name in self.metrics:
             key = max((self.metrics[metrics_name]).keys()) + 1
@@ -1390,7 +1420,7 @@ class Cmf:
         else:
             self.metrics[metrics_name] = {}
             self.metrics[metrics_name][1] = custom_properties
-        os.chdir(os.getcwd())
+        os.chdir(logging_dir)
 
     def commit_metrics(self, metrics_name: str):
         """ Writes the in-memory metrics to a Parquet file, commits the metrics file associated with the metrics id to DVC and Git,
@@ -1407,12 +1437,20 @@ class Cmf:
         Returns:
            Artifact object from the ML Protocol Buffers library associated with the new metrics artifact.
         """
+
+        logging_dir = os.getcwd()
+        if not logging_dir == self.cmf_init_path: 
+            os.chdir(self.cmf_init_path)
         metrics_df = pd.DataFrame.from_dict(
             self.metrics[metrics_name], orient="index")
         metrics_df.index.names = ["SequenceNumber"]
         metrics_df.to_parquet(metrics_name)
         commit_output(metrics_name, self.execution.id)
         uri = dvc_get_hash(metrics_name)
+
+        if uri == "":
+            print("Error in getting the dvc hash,return without logging")
+            return null
         metrics_commit = uri
         name = (
             metrics_name
@@ -1457,6 +1495,8 @@ class Cmf:
             self.driver.create_artifact_relationships(
                 self.input_artifacts, child_artifact, self.execution_label_props
             )
+
+        os.chdir(logging_dir)
         return metrics
 
     def commit_existing_metrics(self, metrics_name: str, uri: str, custom_properties: t.Optional[t.Dict] = None):
@@ -1697,8 +1737,14 @@ class Cmf:
             dataslice_df.to_parquet(self.name)
             existing_artifact = []
 
+
             commit_output(self.name, self.writer.execution.id)
+
             c_hash = dvc_get_hash(self.name)
+            if c_hash == "":
+                print("Error in getting the dvc hash,return without logging")
+                return null
+
             dataslice_commit = c_hash
             remote = dvc_get_url(self.name)
             if c_hash and c_hash.strip():
